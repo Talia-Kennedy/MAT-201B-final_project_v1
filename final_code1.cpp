@@ -16,6 +16,7 @@ Vec3f randomVec3f(float scale) {
 struct AlloApp : App {
   Parameter timeStep{"/timeStep", "", 0.1, 0.01, 0.6};
   Parameter boundarySize{"/boundSize", "", 0.1, 0.01, 10.0};
+  
 
   // Parameter size{"/size","", 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10};
   // Parameter speed{"/speed","", 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10};
@@ -28,6 +29,11 @@ struct AlloApp : App {
   std::vector<float> size;     // (0, 1]
   std::vector<int> interest;   // (0, 1]
   std::vector<float> quantity; // number of agents
+  std::vector <float> speed;
+  
+  /// L system vectors
+  std::vector<std::string> lsystem{{"0"}}; // (1 → 11), (0 → 1[0]0)
+  std::unordered_map<char, std::string> rules = {{'0', "1[0]0"}, {'1', "11"}};
 
   /// MESH OBJECTS CREATED:
   /// Red fish (Rf) Blue fish (Bf) Yellow fish (Yf) and Plants(?)
@@ -49,8 +55,6 @@ struct AlloApp : App {
 
   /// MESH FOR FISH BUILD
 
-  /// 3 different meshes for fishes?
-  /// All need different sizes
   void onCreate() override {
     nav().pos(0, 0, 10);
     addSphere(mesh);
@@ -64,6 +68,13 @@ struct AlloApp : App {
     addRect(mesh);
     mesh.scale(0.5, 1);
     mesh.translate(-2, 0);
+
+    // L string system
+
+    nav().faceToward(Vec3f(0, 0, 0));
+
+    
+
     /// Inserting and positioning 2D objects:
     /// add in another mesh shape to create fins?
     /// sideways heart for tail?
@@ -71,6 +82,8 @@ struct AlloApp : App {
     /// the top fin isoscoles trapezoid?
 
     Mesh body;
+    
+    
     /// addSphere(body);
     /// body.scale(0.2, 0.6, 1.2);
 
@@ -94,8 +107,16 @@ struct AlloApp : App {
       agent.push_back(p);
       size.push_back(rnd::uniform(0.05, 1.0));
       interest.push_back(-1);
+      speed.push_back(5);
     }
+
+
+    food.push_back(randomVec3f(4));
   }
+
+
+
+  
 
   /// All fish have hitbox
   /// Red fish attracted to nearest plant, repelled by nearest yellow fish
@@ -106,23 +127,19 @@ struct AlloApp : App {
 
   /// FOOD/PLANT
 
-  Vec3f food; // 12 Plants ONLY (Evenly spaced in simulation)
+  std::vector<Vec3f> food; // 12 Plants ONLY (Evenly spaced in simulation)
   double time = 0;
 
   double fish_double_timer = 0;
+
+  double food_double_timer = 0;
 
   bool paused = false;
   void onAnimate(double dt) override {
     if (paused)
       return;
 
-    if (time > 3) {
-      time -= 3;
-      // genetation time for plants
-      //  if temp is between 4.1 -6 double every 20 second
-      food = randomVec3f(3);
-    }
-
+      
     /// HEALTHBAR: Lost or gained by eating, starving or being eaten
     /// RED FISH : 0-10 points
     /// if Rf eats 1 plants, health bar up 1
@@ -143,11 +160,19 @@ struct AlloApp : App {
 
     time += dt;
     fish_double_timer += dt;
+    food_double_timer += dt;
 
-    if (fish_double_timer > 10) {
-      fish_double_timer -= 10;
+    if (food_double_timer > 20) {
+        food_double_timer -= 20;
 
-      // double the number of fish....
+        food.push_back(randomVec3f(5));
+
+        // double
+    }; //// food doubling (broken rn)
+
+
+    if (fish_double_timer > 60) {
+      fish_double_timer -= 60; /// How fast fish population doubles (will be 60 seconds)
 
       for (int i = 0; i < 10; ++i) {
         Nav p;
@@ -182,7 +207,20 @@ struct AlloApp : App {
         agent[i].faceToward(agent[interest[i]].pos(), 0.1);
         agent[i].nudgeToward(agent[interest[i]].pos(), -0.1);
       } else {
-        agent[i].faceToward(food, 0.1);
+        int nearest = -1;
+        float distance = 999999;
+        for (int k = 0; k < food.size(); ++k) {
+          float d2 = (food[k] - agent[i].pos()).magSqr();
+          if (d2 < distance) {
+            nearest = k;
+            distance = d2;
+          }
+        } // we have the nearest
+        
+
+        if (nearest > -1) {
+          agent[i].faceToward(food[nearest], 0.1);
+        }
       }
     }
 
@@ -208,6 +246,7 @@ struct AlloApp : App {
   /// ClOCK FOR REPRODUCTION
   /// Healthy temp.: every 60 seconds living fish population doubles
   /// Healthy temp: every 20 seconds remainings branches grow
+
 
   /// Lighting and coloring
   void onDraw(Graphics &g) override {
@@ -239,16 +278,29 @@ struct AlloApp : App {
     /// Fish and plant colors need to be diffeernt but they get blended?
 
     /// PLANT MESH ( 1 line = 1 unit of food)
+
+    
+
     Mesh m;
     addCylinder(m, 0.1);
     /// change to leaf or shape//
     m.generateNormals();
-    g.translate(food);
-    g.color(0.2, 1, 0.6);
-    /// makes plant green//
-    g.draw(m);
+    g.color(0.2, 1, 0.6); /// makes plant green//
+
+    for (auto& f : food) {
+      g.translate(f);
+      g.draw(m);
+    }
+
+
+
+    /// generate new mesh quantity 
+
+
   }
 };
+
+
 /// L-systems are 2-D
 /// Translation into 3D?
 /// Better system for food instead of stems?
@@ -259,3 +311,6 @@ int main() {
   app.configureAudio(48000, 512, 2, 0);
   app.start();
 }
+
+
+
